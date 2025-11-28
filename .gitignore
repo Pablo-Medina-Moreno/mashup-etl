@@ -1,0 +1,75 @@
+# ===========================================
+#   ENTORNOS VIRTUALES
+# ===========================================
+.venv/
+venv/
+env/
+ENV/
+*.pyenv
+
+# ===========================================
+#   DATOS (MUY IMPORTANTE EN ESTA PRÁCTICA)
+# ===========================================
+data/input/*
+data/raw/*
+data/processed/*
+data/output/*
+!data/.gitkeep
+
+# Evitar subir datasets pesados sin querer
+*.csv
+*.parquet
+*.json
+
+# ===========================================
+#   ARCHIVOS DE CONFIGURACIÓN Y SECRETOS
+# ===========================================
+.env
+*.env
+.env.*
+
+# No subir claves ni tokens
+apikey.txt
+secret.key
+
+# ===========================================
+#   PYTHON BASURA AUTOMÁTICA
+# ===========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+
+# ===========================================
+#   COMPILADOS / BUILD
+# ===========================================
+build/
+dist/
+*.egg-info/
+
+# ===========================================
+#   LOGS
+# ===========================================
+logs/
+*.log
+
+# ===========================================
+#   IDE / EDITORES
+# ===========================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ===========================================
+#   SISTEMA
+# ===========================================
+.DS_Store
+Thumbs.db
