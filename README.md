@@ -22,7 +22,7 @@ source .venv/bin/activate   # en Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m src.main_extract
 python -m src.main_transform
-python -m src.inspect_parquet songs_integrated
+python -m src.main_load
 ```
 
 ---

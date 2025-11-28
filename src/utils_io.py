@@ -1,3 +1,4 @@
+# src/utils_io.py
 """
 Utilidades de logging, I/O y helpers genéricos para el ETL.
 """
@@ -20,7 +21,8 @@ def setup_logging(level: int = logging.INFO) -> None:
     """
     Configura el logger raíz para el proyecto.
 
-    Se llama una vez al inicio del script principal (main_extract.py).
+    Se llama una vez al inicio del script principal
+    (main_extract.py o main_transform.py).
     """
     logging.basicConfig(
         level=level,
@@ -55,8 +57,6 @@ def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normaliza los nombres de columnas a snake_case, minúsculas,
     sin espacios ni caracteres raros.
-
-    Esto facilita mucho la fase de Transform.
     """
     def _normalize(col: str) -> str:
         col = col.strip()
@@ -71,8 +71,6 @@ def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
 def basic_profiling(df: pd.DataFrame, dataset_name: str) -> None:
     """
     Saca por log un pequeño profiling del DataFrame para trazabilidad.
-
-    Aquí solo se muestra información básica para no inundar los logs.
     """
     logger = logging.getLogger(f"profiling.{dataset_name}")
 
@@ -80,21 +78,18 @@ def basic_profiling(df: pd.DataFrame, dataset_name: str) -> None:
     logger.info("Filas: %s, Columnas: %s", df.shape[0], df.shape[1])
     logger.info("Primeras columnas: %s", list(df.columns[:10]))
 
-    # Para no llenar demasiado, solo miramos nulos de las primeras columnas
     null_counts = df.iloc[:, :10].isna().sum()
     logger.info("Nulos (primeras columnas):\n%s", null_counts)
 
 
 # ==========================
-#  I/O: CSV / PARQUET
+#  I/O: CSV / JSON
 # ==========================
 
 
 def read_csv_with_logging(path: Path, dataset_name: str) -> pd.DataFrame:
     """
     Lee un CSV y controla errores comunes, sacando logs informativos.
-
-    Lanza FileNotFoundError si el fichero no existe.
     """
     logger = logging.getLogger(f"io.read_csv.{dataset_name}")
     logger.info("Leyendo CSV de %s desde: %s", dataset_name, path)
@@ -117,22 +112,23 @@ def read_csv_with_logging(path: Path, dataset_name: str) -> pd.DataFrame:
         raise
 
 
-def write_parquet_with_logging(df: pd.DataFrame, path: Path, dataset_name: str) -> None:
+def write_json_with_logging(df: pd.DataFrame, path: Path, dataset_name: str) -> None:
     """
-    Escribe un DataFrame a formato Parquet, con logs y control de errores.
+    Escribe un DataFrame en formato JSON (una fila por línea),
+    con logs y control de errores.
     """
-    logger = logging.getLogger(f"io.write_parquet.{dataset_name}")
-    logger.info("Guardando %s en formato Parquet: %s", dataset_name, path)
+    logger = logging.getLogger(f"io.write_json.{dataset_name}")
+    logger.info("Guardando %s en formato JSON: %s", dataset_name, path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        df.to_parquet(path, index=False)
+        df.to_json(path, orient="records", lines=True, force_ascii=False)
         logger.info(
-            "Parquet de %s guardado correctamente. Filas: %s, Columnas: %s",
+            "JSON de %s guardado correctamente. Filas: %s, Columnas: %s",
             dataset_name,
             df.shape[0],
             df.shape[1],
         )
     except Exception as exc:
-        logger.exception("Error guardando Parquet de %s: %s", dataset_name, exc)
+        logger.exception("Error guardando JSON de %s: %s", dataset_name, exc)
         raise

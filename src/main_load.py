@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from .utils_io import setup_logging
-from .utils_db import get_postgres_engine, drop_all_tables, create_star_schema_tables
+from .utils_db import get_postgres_engine, drop_all_tables
 from .load_schema import load_schema
 
 
@@ -18,13 +18,10 @@ def main() -> None:
     try:
         engine = get_postgres_engine()
 
-        # 1. BORRAR TODAS LAS TABLAS DE LA BASE DE DATOS
+        # 1. BORRAR TODAS LAS TABLAS DE LA BASE DE DATOS (schema public)
         drop_all_tables(engine)
 
-        # 2. Crear el modelo en estrella
-        create_star_schema_tables(engine)
-
-        # 3. Cargar datos
+        # 2. Crear tablas y cargar datos desde songs_integrated.json
         load_schema(engine)
 
     except Exception as e:
