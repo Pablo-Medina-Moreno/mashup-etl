@@ -1,8 +1,9 @@
 # src/transform_integrated.py
 """
 Transform de integración: une los tres datasets ya transformados
-en un único dataset maestro de canciones, completando al máximo
-la información de tracks, álbumes y artistas.
+(en formato anidado {track, album, artists}) en un único dataset
+maestro de canciones, completando al máximo la información de
+tracks, álbumes y artistas.
 
 Prioridad de fuentes a nivel de TRACK (para completar campos):
 
@@ -23,6 +24,7 @@ Además:
 - Propaga información rica (popularidad, followers, géneros, urls, etc.) a
   todos los objetos artistas y álbumes que compartan id o nombre.
 """
+
 
 from __future__ import annotations
 

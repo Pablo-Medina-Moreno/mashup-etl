@@ -1,4 +1,18 @@
 # src/main_load.py
+"""
+Punto de entrada para la fase de Load del ETL.
+
+Uso:
+    Desde la raíz del proyecto:
+
+        python -m src.main_load
+
+Responsabilidad:
+- Conectarse a la base de datos PostgreSQL usando DB_URI.
+- Eliminar todas las tablas existentes del esquema public (drop_all_tables).
+- Crear las tablas del modelo musical (artists, albums, tracks, etc.).
+- Cargar los datos desde songs_integrated.json en dichas tablas.
+"""
 
 from __future__ import annotations
 

@@ -2,8 +2,18 @@
 """
 Punto de entrada para la fase de Extract del ETL.
 
-Ejemplo:
-    python -m src.main_extract
+Uso:
+    Desde la raíz del proyecto:
+
+        python -m src.main_extract
+
+Responsabilidad:
+- Orquestar la fase de EXTRACT para todos los datasets.
+- Cada extract_*:
+    * Lee su CSV desde data/input.
+    * Normaliza nombres de columnas.
+    * Hace profiling ligero.
+    * Guarda un JSON "raw" en data/raw (sin lógica de negocio).
 """
 
 from __future__ import annotations
@@ -19,6 +29,7 @@ from .extract_track_data_final import extract_track_data_final
 def main() -> None:
     """
     Orquesta la ejecución completa de la fase de extracción.
+
     Ejecuta TODOS los Extract:
         1. Spotify Tracks (Kaggle)
         2. Spotify–YouTube Dataset

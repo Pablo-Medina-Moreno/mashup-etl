@@ -1,54 +1,133 @@
-# mashup-recommender
+# 🎵 ETL Musical
 
-# Mashup Recommender – ETL (Fase Extract)
+## 📌 Descripción del proyecto
 
-## Estructura básica
+Este repositorio implementa un **pipeline ETL completo** en Python que integra tres datasets musicales:
 
-- `data/input/`  
-  Coloca aquí los ficheros originales descargados de Kaggle:
-  - `spotify_tracks.csv`
-  - `apple_music.csv`
+1. **Spotify Tracks (Kaggle)**
+2. **Spotify–YouTube Dataset**
+3. **Spotify Global Music (track_data_final.csv)**
 
-- `data/raw/`  
-  Aquí se generarán los ficheros Parquet "raw":
-  - `spotify_tracks.parquet`
-  - `apple_music.parquet`
+El objetivo es construir un **modelo relacional normalizado en PostgreSQL**, consolidando información sobre:
 
-## Instalación
+- Canciones (tracks)  
+- Álbumes  
+- Artistas  
+- Géneros de artistas  
+- Relaciones Track–Artista (N:N)
 
-```bash
-python -m venv .venv
-source .venv/bin/activate   # en Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m src.main_extract
-python -m src.main_transform
-python -m src.main_load
+El proyecto sigue la arquitectura clásica:
+
+➡️ **EXTRACT → TRANSFORM → INTEGRATE → LOAD**
+
+---
+
+# 📁 Estructura del proyecto
+```
+mashup-recommender/
+│
+├── data/
+│ ├── input/ ← CSV originales
+│ ├── raw/ ← Se genera en EXTRACT
+│ └── processed/ ← Se genera en TRANSFORM
+│
+├── src/
+│ ├── extract_spotify.py
+│ ├── extract_spotify_youtube.py
+│ ├── extract_track_data_final.py
+│ ├── transform_spotify.py
+│ ├── transform_spotify_youtube.py
+│ ├── transform_track_data_final.py
+│ ├── transform_integrated.py
+│ ├── load_schema.py
+│ ├── main_extract.py
+│ ├── main_transform.py
+│ ├── main_load.py
+│ ├── utils_io.py
+│ └── utils_db.py
+│
+├── config.py
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## 🔟 Qué estamos haciendo exactamente (en términos de ETL)
+# 🔧 Instalación y ejecución del pipeline completo
 
-Solo para dejarlo claro conceptualmente:
+## 1. Descomprimir el proyecto
 
-- **E (Extract)**:  
-  - Tomamos los **datasets originales** (Spotify y Apple Music) tal y como los hemos descargado.
-  - Los leemos con pandas de forma robusta, comprobando que existen, número de filas, etc.
-  - Hacemos una **validación ligera**: columnas importantes, nulos básicos.
+Descargar el `.zip` y extraerlo. La estructura debe quedar así:
 
-- **Resultado de esta fase**:  
-  - Tenemos una “**zona RAW**” (`data/raw/`) en un formato optimizado (Parquet), sobre el que será más cómodo y eficiente trabajar en las siguientes fases (**Transform** & **Load al Data Warehouse**).
+```
+mashup-recommender/
+│
+├── data/
+│ └── input/ ← CSV originales
+│
+├── src/
+├── config.py
+├── requirements.txt
+└── README.md
+```
+--
 
-A partir de aquí, el siguiente paso natural será la **T (Transform)**:  
-- Homogeneizar columnas (nombres, tipos).  
-- Empezar a definir el modelo común (track, artista, tonalidad, etc.).  
-- Preparar las tablas para el futuro Data Warehouse.
+## 2. Crear entorno virtual e instalar dependencias
+
+### En Windows
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### En Linux / MacOS
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+# 3. Ejecutar el pipeline ETL completo
+
+Ejecuta los siguientes comandos **en este orden** desde la raíz del proyecto (donde está `src/` y `config.py`):
 
 ---
 
-Si quieres, en el siguiente mensaje podemos:
+## 🟦 1. EXTRACT  
+Lee los CSV de `data/input/`, normaliza columnas y genera los JSON RAW en `data/raw/`.
 
-- Diseñar y codificar la **fase Transform** sobre estos Parquet (limpieza + normalización de tonos/BPM),  
-o  
-- Añadir ya el **extract de alguna API** (por ejemplo, Spotify Web API para popularidad actual) y dejar otro módulo `extract_spotify_api.py`.
-::contentReference[oaicite:0]{index=0}
+```bash
+python -m src.main_extract
+```
+Salida generada:
+
+```
+data/raw/
+   spotify_tracks_raw.json
+   spotify_youtube_raw.json
+   track_data_final_raw.json
+```
+## 🟩 2. TRANSFORM
+
+Procesa y limpia cada dataset, los convierte en formato anidado (track, album, artists) y luego ejecuta la integración final.
+
+```bash
+python -m src.main_transform
+```
+Salida generada:
+```
+data/processed/
+   spotify_tracks_clean.json
+   spotify_youtube_clean.json
+   track_data_final_clean.json
+   songs_integrated.json   ← archivo maestro final
+```
+## 🟧 3. LOAD
+
+Carga el dataset integrado en PostgreSQL.
+
+```bash
+python -m src.main_load
+```

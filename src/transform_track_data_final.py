@@ -3,17 +3,22 @@
 Transform del dataset Spotify Global Music (track_data_final.csv).
 
 Responsabilidad:
-- Leer JSON RAW desde data/raw
-- Eliminar columnas índice si las hubiera
-- Asegurar tipos básicos (track_id string)
-- Parsear artist_genres (string con lista) a lista real
+- Leer JSON RAW desde data/raw.
+- Normalizar columnas específicas del dataset:
+    * Asegurar prefijos track_/album_/artist_ cuando aplique.
+    * Asegurar tipos básicos (track_id y album_id como string).
+    * Generar album_spotify_url y track_spotify_url.
+    * Asegurar album_release_date como string.
+- Eliminar columnas índice si las hubiera.
+- Asegurar track_id válido y filtrar filas sin ID.
+- Parsear artist_genres (string con lista) a lista real.
 - Construir, para cada fila, un objeto:
     {
       "track": {...},
       "album": {...},
       "artists": [...]
     }
-- Guardar dataset limpio en data/processed
+- Guardar dataset limpio en data/processed.
 """
 
 from __future__ import annotations
@@ -27,6 +32,84 @@ from config import TRACK_DATA_FINAL_RAW_JSON, TRACK_DATA_FINAL_PROCESSED_JSON
 from .utils_io import basic_profiling, write_json_with_logging
 
 logger = logging.getLogger("transform_track_data_final")
+
+
+def _postprocess_track_data_final(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Postprocesado específico para track_data_final en TRANSFORM.
+
+    - Renombrar columnas para prefijos consistentes (track_/album_).
+    - Asegurar track_id y album_id como string (si existen).
+    - Generar track_spotify_url y album_spotify_url.
+    - Asegurar album_release_date como string (parseo de fecha se hará después).
+    """
+
+    # ---------------------------------------------------------------------
+    # 1. Renombrado de columnas para prefijos consistentes
+    # ---------------------------------------------------------------------
+    rename_map: dict[str, str] = {}
+
+    # Asegurar prefijo track_ para columnas de track
+    # (en este dataset ya suelen venir bien, pero explicit hay que renombrarla)
+    if "explicit" in df.columns and "track_explicit" not in df.columns:
+        rename_map["explicit"] = "track_explicit"
+
+    # Posibles variantes raras de nombres de duración de track
+    if "trackduration_ms" in df.columns and "track_duration_ms" not in df.columns:
+        rename_map["trackduration_ms"] = "track_duration_ms"
+    if "track_duration" in df.columns and "track_duration_ms" not in df.columns:
+        rename_map["track_duration"] = "track_duration_ms"
+
+    # Aquí podrías añadir otros mapeos si hubiera columnas sin prefijo
+    # para artista o álbum, pero en este dataset ya suelen venir como
+    # artist_* y album_*.
+
+    # Aplicar renombrado (SIN duplicar columnas)
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    # ---------------------------------------------------------------------
+    # 2. Tipos básicos y generación de URLs
+    # ---------------------------------------------------------------------
+
+    # Track ID
+    if "track_id" in df.columns:
+        df["track_id"] = df["track_id"].astype(str)
+    else:
+        logger.warning(
+            "El dataset track_data_final no contiene columna 'track_id'. "
+            "Esto complicará la integración posterior."
+        )
+
+    # Track Spotify URL (si tenemos track_id)
+    if "track_id" in df.columns:
+        df["track_spotify_url"] = "https://open.spotify.com/track/" + df["track_id"]
+    else:
+        # si no hay track_id no generamos la columna
+        if "track_spotify_url" in df.columns:
+            df = df.drop(columns=["track_spotify_url"])
+
+    # Álbum: asegurar album_id y album_spotify_url
+    if "album_id" in df.columns:
+        df["album_id"] = df["album_id"].astype(str)
+        df["album_spotify_url"] = "https://open.spotify.com/album/" + df["album_id"]
+    else:
+        logger.warning(
+            "El dataset track_data_final no contiene columna 'album_id'. "
+            "No se podrá generar album_spotify_url."
+        )
+        if "album_spotify_url" in df.columns:
+            df = df.drop(columns=["album_spotify_url"])
+
+    # Asegurar fecha de álbum como string (se parseará en otros pasos si hace falta)
+    if "album_release_date" in df.columns:
+        df["album_release_date"] = df["album_release_date"].astype(str)
+
+    # Las columnas de artista en este dataset ya vienen con prefijo artist_:
+    # artist_name, artist_popularity, artist_followers, artist_genres
+    # No hace falta tocarlas aquí.
+
+    return df
 
 
 def _parse_genres(value):
@@ -63,6 +146,10 @@ def _parse_genres(value):
 def _clean_track_data_final(df: pd.DataFrame) -> pd.DataFrame:
     """
     Limpieza ligera y normalización de track_data_final.
+
+    - Elimina columnas índice tipo 'unnamed:_0'.
+    - Valida y filtra por track_id no nulo.
+    - Parsea artist_genres a una lista real.
     """
     # 1. Eliminar columnas tipo 'unnamed:_0' si apareciesen
     unnamed_cols = [c for c in df.columns if c.lower().startswith("unnamed")]
@@ -129,7 +216,7 @@ def _row_to_nested_object(row: pd.Series) -> dict:
 
     # --- ARTIST (único en este dataset) ---
     artist_obj = {
-        "artist_id": row.get("artist_id"),  # aún será None, se rellenará luego
+        "artist_id": row.get("artist_id"),  # aún será None, se rellenará luego si procede
         "artist_name": row.get("artist_name"),
         "artist_popularity": row.get("artist_popularity"),
         "artist_followers": row.get("artist_followers"),
@@ -153,12 +240,20 @@ def transform_track_data_final() -> None:
     logger.info("=== INICIO TRANSFORM: %s ===", dataset_name)
     logger.info("Leyendo RAW JSON desde: %s", TRACK_DATA_FINAL_RAW_JSON)
 
+    # 1. Leer RAW JSON
     df = pd.read_json(TRACK_DATA_FINAL_RAW_JSON, lines=True)
+
+    # 2. Postprocesado específico (renombrados, IDs, URLs, fechas)
+    df = _postprocess_track_data_final(df)
+
+    # 3. Limpieza y normalización (unnamed, track_id, artist_genres)
     df = _clean_track_data_final(df)
 
+    # 4. Construir objetos anidados
     nested_records = df.apply(_row_to_nested_object, axis=1).tolist()
     nested_df = pd.DataFrame(nested_records)
 
+    # 5. Profiling y guardado
     basic_profiling(nested_df, dataset_name)
     write_json_with_logging(nested_df, TRACK_DATA_FINAL_PROCESSED_JSON, dataset_name)
 

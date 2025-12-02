@@ -2,8 +2,20 @@
 """
 Punto de entrada para la fase de Transform del ETL.
 
-Ejemplo:
-    python -m src.main_transform
+Uso:
+    Desde la raíz del proyecto:
+
+        python -m src.main_transform
+
+Responsabilidad:
+- Orquestar la fase de TRANSFORM para todos los datasets.
+- Cada transform_*:
+    * Lee el JSON "raw" desde data/raw.
+    * Aplica la lógica de negocio (renombrados, URLs, parseos, etc.).
+    * Construye objetos anidados {track, album, artists}.
+    * Guarda el resultado limpio en data/processed.
+- Finalmente, ejecuta la transformación integrada para obtener
+  un único dataset maestro de canciones.
 """
 
 from __future__ import annotations
@@ -21,10 +33,10 @@ def main() -> None:
     """
     Orquesta la ejecución completa de la fase de Transform.
     Ejecuta:
-        1. Transform individual de Spotify Tracks
-        2. Transform individual de Spotify–YouTube
-        3. Transform individual de track_data_final
-        4. Integración final en un único dataset maestro
+        1. Transform individual de Spotify Tracks.
+        2. Transform individual de Spotify–YouTube.
+        3. Transform individual de track_data_final.
+        4. Integración final en un único dataset maestro.
     """
     setup_logging()
     logger = logging.getLogger("main_transform")

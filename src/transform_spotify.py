@@ -3,9 +3,13 @@
 Transform del dataset de Spotify Tracks (Spotify Kaggle).
 
 Responsabilidad:
-- Leer JSON RAW desde data/raw
-- Limpiar columnas inútiles (ej. índices tipo 'unnamed:_0')
-- Asegurar track_id como string y descartar filas sin track_id
+- Leer JSON RAW desde data/raw.
+- Normalizar columnas específicas del dataset:
+    * Prefijos track_/album_ para audio features y metadatos.
+    * Generar track_spotify_url.
+    * Mantener la lista cruda de artistas como track_artists_raw.
+- Limpiar columnas inútiles (ej. índices tipo 'unnamed:_0').
+- Asegurar track_id como string y descartar filas sin track_id.
 - Parsear artistas múltiples:
     - track_artists_raw (string original)
     - track_artists_list (lista de artistas)
@@ -15,13 +19,13 @@ Responsabilidad:
       "album": {...},
       "artists": [...]
     }
-- Guardar dataset transformado en data/processed
+- Guardar dataset transformado en data/processed.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Any
 
 import pandas as pd
 
@@ -31,7 +35,78 @@ from .utils_io import basic_profiling, write_json_with_logging
 logger = logging.getLogger("transform_spotify")
 
 
-def _split_artists(value) -> List[str]:
+def _postprocess_spotify_tracks(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Operaciones específicas de normalización de columnas para Spotify Tracks.
+
+    - Renombrar columnas con prefijo track_/album_ para audio features,
+      popularidad y metadatos de track.
+    - Mantener la lista cruda de artistas como track_artists_raw.
+    - Asegurar que track_id es string (si está) y generar track_spotify_url.
+    """
+
+    # ----------------------------------------------------------
+    # 1. Renombrado de columnas (sin duplicar)
+    # ----------------------------------------------------------
+    rename_map: dict[str, str] = {}
+
+    # Track name: a veces viene como "track"
+    if "track" in df.columns and "track_name" not in df.columns:
+        rename_map["track"] = "track_name"
+
+    # Métricas básicas de track
+    if "duration_ms" in df.columns:
+        rename_map["duration_ms"] = "track_duration_ms"
+    if "explicit" in df.columns:
+        rename_map["explicit"] = "track_explicit"
+    if "popularity" in df.columns:
+        rename_map["popularity"] = "track_popularity"
+
+    # Audio features -> track_
+    audio_cols = [
+        "danceability",
+        "energy",
+        "key",
+        "loudness",
+        "mode",
+        "speechiness",
+        "acousticness",
+        "instrumentalness",
+        "liveness",
+        "valence",
+        "tempo",
+        "time_signature",
+    ]
+    for col in audio_cols:
+        if col in df.columns:
+            rename_map[col] = f"track_{col}"
+
+    # Género ya viene como track_genre, lo dejamos tal cual
+
+    # Álbum: en este dataset solo tenemos el nombre de álbum
+    # ya se llama album_name tras normalize_column_names, no hay que tocarlo.
+
+    # Lista cruda de artistas del track (puede contener ';')
+    if "artists" in df.columns:
+        rename_map["artists"] = "track_artists_raw"
+
+    # Aplicar el renombrado de una vez
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    # ----------------------------------------------------------
+    # 2. Tipos y track_spotify_url
+    # ----------------------------------------------------------
+    if "track_id" not in df.columns:
+        logger.warning("El dataset Spotify Tracks no contiene columna 'track_id'.")
+    else:
+        df["track_id"] = df["track_id"].astype(str)
+        df["track_spotify_url"] = "https://open.spotify.com/track/" + df["track_id"]
+
+    return df
+
+
+def _split_artists(value: Any) -> List[str]:
     """
     Recibe el valor de 'track_artists_raw' (string tipo
     'Jason Mraz;Colbie Caillat') y devuelve una lista limpia.
@@ -46,6 +121,10 @@ def _split_artists(value) -> List[str]:
 def _clean_spotify_tracks(df: pd.DataFrame) -> pd.DataFrame:
     """
     Limpieza ligera del dataset Spotify Tracks.
+
+    - Eliminación de columnas índice (unnamed:_*).
+    - Validación y filtrado de track_id.
+    - Creación de track_artists_list a partir de track_artists_raw.
     """
     # 1. Eliminar columnas índice tipo 'unnamed:_0'
     unnamed_cols = [c for c in df.columns if c.lower().startswith("unnamed")]
@@ -152,12 +231,20 @@ def transform_spotify() -> None:
     logger.info("=== INICIO TRANSFORM: %s ===", dataset_name)
     logger.info("Leyendo RAW JSON desde: %s", SPOTIFY_TRACKS_RAW_JSON)
 
+    # 1. Leer RAW JSON
     df = pd.read_json(SPOTIFY_TRACKS_RAW_JSON, lines=True)
+
+    # 2. Normalización específica de columnas (antes estaba en EXTRACT)
+    df = _postprocess_spotify_tracks(df)
+
+    # 3. Limpieza general y manejo de artistas múltiples
     df = _clean_spotify_tracks(df)
 
+    # 4. Construir objetos anidados
     nested_records = df.apply(_row_to_nested_object, axis=1).tolist()
     nested_df = pd.DataFrame(nested_records)
 
+    # 5. Profiling y guardado
     basic_profiling(nested_df, dataset_name)
     write_json_with_logging(nested_df, SPOTIFY_TRACKS_PROCESSED_JSON, dataset_name)
 
